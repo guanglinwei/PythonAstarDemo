@@ -9,4 +9,5 @@ This is a simple python pathfinding demo for the [Astar/A* search algorithm.](ht
 
 ### Instructions
 
-Run the astar.py file.
+- Install or clone this repo
+- Run the astar.py file
