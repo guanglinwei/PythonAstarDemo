@@ -35,6 +35,9 @@ grid = [0 for i in range(rows)]
 for i in range(cols):
     grid[i] = [0 for i in range(rows)]
 
+#if the help menu is open, don't open another one
+global tk_win_exists
+
 
 class tile:
     def __init__(self, x, y, col = WHITE):
@@ -259,6 +262,9 @@ INPUT_RMB = 1
 INPUT_SPACE = 2
 INPUT_KEY_R = 3
 def handle_input(button, ctx):
+    if tk_win_exists: 
+        return
+        
     # place tiles
     if button == INPUT_LMB:
         mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -383,7 +389,12 @@ def main():
                 pygame.quit()
                 quit()
 
+            # still actually receive the reset input. This will stop the algorithm
             if not app_ctx.receive_inputs:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                    app_ctx.astar_iterator = None
+                    clear_open_closed()
+                    app_ctx.receive_inputs = True
                 continue
 
             if pygame.mouse.get_pressed()[0]:
@@ -396,31 +407,44 @@ def main():
                     handle_input(INPUT_SPACE, app_ctx)
                 elif event.key == pygame.K_r:
                     handle_input(INPUT_KEY_R, app_ctx)
+                elif event.key == pygame.K_h:
+                    if not tk_win_exists:
+                        tkwind = create_tk_window()
 
 # explanation window
-def confirm_tk_window():
-    tkwind.quit()
-    tkwind.destroy()
+def confirm_tk_window(win):
+    # win.quit()
+    global tk_win_exists
+    tk_win_exists = False
+    win.destroy()
+    
+def create_tk_window():
+    global tk_win_exists
+    tk_win_exists = True
+    
+    win = tk.Tk()
+    win.geometry("280x200")
+    win.title("Astar Pathfinding Python Demo")
+    labels = [
+        tk.Label(win, text="Press H to open this window again"),
+        tk.Label(win, text="Left Click to place the start tile (orange)"),
+        tk.Label(win, text="Left Click again to place the end tile (blue)"),
+        tk.Label(win, text="If you have a start and end tile, Left Click make walls"),
+        tk.Label(win, text="Right Click to delete a tile"),
+        tk.Label(win, text="Press Space to start pathfinding"),
+        tk.Label(win, text="Press R to restart (This can be done at any time)")
+    ]
+    submit = tk.Button(win, text="OK", command=lambda: confirm_tk_window(win))
+    submit.grid(column=1, row=len(labels)+2)
+    for i in range(len(labels)):
+        labels[i].grid(column=1, row=i+1)
+
+    win.update()
+    tk.mainloop()
+    return win
 
 
-tkwind = tk.Tk()
-tkwind.geometry("280x180")
-tkwind.title("Astar Pathfinding Python Demo")
-labels = [
-    tk.Label(tkwind, text="Left Click to place the start tile (orange)"),
-    tk.Label(tkwind, text="Left Click again to place the end tile (blue)"),
-    tk.Label(tkwind, text="If you have a start and end tile, Left Click make walls"),
-    tk.Label(tkwind, text="Right Click to delete a tile"),
-    tk.Label(tkwind, text="Press Space to start pathfinding"),
-    tk.Label(tkwind, text="Press R to restart")
-]
-submit = tk.Button(tkwind, text="OK", command=confirm_tk_window)
-submit.grid(column=1, row=len(labels)+2)
-for i in range(len(labels)):
-    labels[i].grid(column=1, row=i+1)
-
-tkwind.update()
-tk.mainloop()
+tkwind = create_tk_window()
 
 
 pygame.init()
