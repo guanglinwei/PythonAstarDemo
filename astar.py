@@ -38,6 +38,9 @@ for i in range(cols):
 #if the help menu is open, don't open another one
 global tk_win_exists
 
+# (x, y)
+global last_mouse_point
+global update_speed
 
 class tile:
     def __init__(self, x, y, col = WHITE):
@@ -127,6 +130,9 @@ display = pygame.display.set_mode((screen_w, screen_h))
 
 # A*
 def astar(ctx):
+    global update_speed
+    update_speed = 1.0
+    
     if ctx.has_path_now:
         clear_open_closed()
 
@@ -161,6 +167,7 @@ def astar(ctx):
 
         # are we at the end? if so show path
         if(current == end):
+            update_speed = 1.0
         # if(end in closedSet):
             ctx.has_path_now = True
             end.g = current.g + heu(current, end)
@@ -182,6 +189,9 @@ def astar(ctx):
             start.set_start()
             ctx.receive_inputs = True
             return True
+
+        # increase speed of animation   
+        update_speed += 0.01
 
         # tiles around current
         children = current.get_children()
@@ -267,11 +277,22 @@ def handle_input(button, ctx):
         
     # place tiles
     if button == INPUT_LMB:
+        global last_mouse_point
+
         mouse_x, mouse_y = pygame.mouse.get_pos()
         mouse_x = int(mouse_x // tile_w)
         mouse_y = int(mouse_y // tile_h)
 
+        if ctx.current_start is None or ctx.current_end is None or last_mouse_point[0] == -1:
+            pass
+        
+        else:
+            draw_line_between(mouse_x, mouse_y, last_mouse_point[0], last_mouse_point[1], BLACK)
+
+        last_mouse_point = (mouse_x, mouse_y)
+
         mouse_tile = grid[mouse_x][mouse_y]
+
         # if the tile clicked is empty, then set it to start/end/wall
         if mouse_tile.is_empty():
             if(ctx.current_start is None):
@@ -288,6 +309,11 @@ def handle_input(button, ctx):
 
     # delete tile
     if button == INPUT_RMB:
+        grid[0][1].color = RED
+        draw_line_between(2, 32, 16, 2, BLACK)
+        draw_line_between(5, 48, 22, 42, GREEN)
+        draw_line_between(4, 4, 16, 2, BLACK)
+        return
         mouse_x, mouse_y = pygame.mouse.get_pos()
         mouse_x = int(mouse_x // tile_w)
         mouse_y = int(mouse_y // tile_h)
@@ -316,6 +342,62 @@ def handle_input(button, ctx):
         setup_grid(ctx)
         return
 
+
+def draw_line_between(x1, y1, x2, y2, col):
+    # vertical
+    if x1 == x2:
+        for y in range(min(y1, y2), max(y1, y2) + 1):
+            attempt_draw_color(x1, y, col)
+        return
+
+    # horiz
+    if y1 == y2:
+        for x in range(min(x1, x2), max(x1, x2) + 1):
+            attempt_draw_color(x, y1, col)
+        return
+
+    # swap so point 1 is to left of point 2
+    if x1 > x2:
+        tx, ty = x1, y1
+        x1, y1 = x2, y2
+        x2, y2 = tx, ty
+
+    dx = float(x2 - x1)
+    dy = float(y2 - y1)
+    steep = abs(dy) > dx
+    
+    derr = abs(dx / dy) if steep else abs(dy / dx)
+    err = 0.0
+
+    # |slope| > 1
+    if steep:
+        x = x1
+        r = range(min(y1, y2), max(y1, y2) + 1)
+        if y1 > y2:
+            r = reversed(r)
+        
+        for y in r:
+            attempt_draw_color(x, y, col)
+            err += derr
+            if err >= 0.5:
+                x += (1 if dx > 0 else -1)
+                err -= 1.0
+
+    # |slope| < 1
+    else:
+        y = y1
+        for x in range(min(x1, x2), max(x1, x2) + 1):
+            attempt_draw_color(x, y, col)
+            err += derr
+            if err >= 0.5:
+                y += (1 if dy > 0 else -1)
+                err -= 1.0
+
+
+def attempt_draw_color(x, y, col):
+    if x in range(len(grid)) and y in range(len(grid[0])):
+        if not (grid[x][y].is_start() or grid[x][y].is_end()):
+            grid[x][y].color = col
 
 
 def setup_grid(ctx):
@@ -370,17 +452,23 @@ class ctx:
 
 
 def main():
+    global last_mouse_point
+    last_mouse_point = (-1, -1)
+    global update_speed
+    update_speed = 1.0
 
     app_ctx = ctx()
 
     setup_grid(app_ctx)
 
     while True:
-        if app_ctx.astar_iterator is not None:
-            try:
-                next(app_ctx.astar_iterator)
-            except StopIteration:
-                app_ctx.astar_iterator = None
+        # global update_speed
+        for i in range(int(update_speed)):
+            if app_ctx.astar_iterator is not None:
+                try:
+                    next(app_ctx.astar_iterator)
+                except StopIteration:
+                    app_ctx.astar_iterator = None
 
         redraw_screen()
 
@@ -399,8 +487,10 @@ def main():
 
             if pygame.mouse.get_pressed()[0]:
                 handle_input(INPUT_LMB, app_ctx)
-            elif pygame.mouse.get_pressed()[2]:
-                handle_input(INPUT_RMB, app_ctx)
+            else:
+                # last_mouse_point = (-1, -1)
+                if pygame.mouse.get_pressed()[2]:
+                    handle_input(INPUT_RMB, app_ctx)
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
@@ -410,6 +500,10 @@ def main():
                 elif event.key == pygame.K_h:
                     if not tk_win_exists:
                         tkwind = create_tk_window()
+
+        if not pygame.mouse.get_pressed()[0]:
+            last_mouse_point = (-1, -1)
+            
 
 # explanation window
 def confirm_tk_window(win):
